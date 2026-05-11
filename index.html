@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Melkor</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- crosshair: two full-viewport lines forming a + at the (eased) cursor position -->
+  <div class="crosshair" aria-hidden="true">
+    <div class="crosshair__h"></div>
+    <div class="crosshair__v"></div>
+    <div class="crosshair__dot"></div>
+  </div>
+
+  <!-- top-left: wordmark -->
+  <header class="tl">
+    <a class="wordmark" href="/">Melkor</a>
+  </header>
+
+  <!-- top-right: invert toggle (swaps fg/bg) -->
+  <div class="tr">
+    <button id="invert" type="button" aria-label="invert colors" aria-pressed="false">
+      <span class="invert__dot invert__dot--a"></span>
+      <span class="invert__dot invert__dot--b"></span>
+    </button>
+  </div>
+
+  <!-- left column: menu + contact key hint -->
+  <aside class="left">
+    <nav class="menu" aria-label="main">
+      <ul>
+        <li><button class="menu__item" data-panel="products"   type="button">Products</button></li>
+        <li><button class="menu__item" data-panel="enterprise" type="button">Enterprise</button></li>
+        <li><button class="menu__item" data-panel="philosophy" type="button">Philosophy</button></li>
+        <li><button class="menu__item" data-panel="demo"       type="button">Request a Demo</button></li>
+      </ul>
+    </nav>
+    <button class="contact" type="button">
+      <span>Contact</span>
+      <kbd>C</kbd>
+    </button>
+  </aside>
+
+  <!-- popup: small box near the menu. Content swaps based on which menu
+       item was clicked. The backdrop is transparent (no dim) but catches
+       outside clicks so the popup feels lightweight, not modal. -->
+  <div class="panel-backdrop" id="panel-backdrop" hidden></div>
+  <aside class="panel" id="panel" role="dialog" aria-modal="false" aria-labelledby="panel-title" hidden>
+    <div class="panel__inner">
+      <div class="panel__tab" id="panel-title">Philosophy</div>
+      <button class="panel__close" id="panel-close" type="button" aria-label="close">&times;</button>
+      <div class="panel__body" id="panel-body">
+        <!-- content injected by script.js based on data-panel -->
+      </div>
+    </div>
+  </aside>
+
+  <!-- bottom-right: links stack -->
+  <nav class="br" aria-label="external links">
+    <a href="#">LinkedIn</a>
+    <a href="#">Instagram</a>
+    <a href="https://github.com/" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+
+  <!-- center placeholder where the original has its sculpture.
+       Drop in your own thing later: shader, image, mesh, anything.
+       Left empty on purpose. -->
+  <main class="stage" aria-hidden="true"></main>
+
+  <script src="script.js" defer></script>
+</body>
+</html>
