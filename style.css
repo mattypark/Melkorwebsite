@@ -1,22 +1,23 @@
 /* tokens ------------------------------------------------------------------ */
 :root {
-  --bg: #d9d9d9;
-  --fg: #0a0a0a;
-  --muted: #6b6b6b;
-  --rule: #0a0a0a;
-  --pill-bg: rgba(255, 255, 255, 0.55);
-  --pill-br: rgba(10, 10, 10, 0.08);
+  --bg:        #ffffff;
+  --fg:        #0a0a0a;
+  --muted:     #6b6b6b;
+  --rule:      #0a0a0a;
+  --pill-bg:   rgba(255, 255, 255, 0.55);
+  --pill-br:   rgba(10, 10, 10, 0.10);
+
+  /* blue dot palette (subtle on white) */
+  --dot:       rgba(45, 92, 220, 0.55);
+  --dot-soft:  rgba(45, 92, 220, 0.22);
+
+  /* glass lens tints */
+  --lens-1:    rgba(120, 175, 255, 0.45);
+  --lens-2:    rgba(70, 130, 240, 0.32);
+  --lens-3:    rgba(180, 210, 255, 0.55);
+
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Inter", "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
-}
-
-:root[data-theme="dark"] {
-  --bg: #0e0e0e;
-  --fg: #ededed;
-  --muted: #8a8a8a;
-  --rule: #ededed;
-  --pill-bg: rgba(255, 255, 255, 0.06);
-  --pill-br: rgba(255, 255, 255, 0.12);
 }
 
 /* reset ------------------------------------------------------------------- */
@@ -30,59 +31,84 @@ body {
   line-height: 1.4;
   letter-spacing: -0.01em;
   overflow: hidden;
-  cursor: none;            /* hide system cursor; we draw our own crosshair */
+}
+
+/* Background: blue dots + watery glass lenses ------------------------ */
+.bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.bg__dots {
+  position: absolute;
+  inset: -8%;
+  /* two staggered radial gradients = denser, more interesting grid than
+     a single tile. transparent stops keep the white bg showing through. */
+  background-image:
+    radial-gradient(circle at 1px 1px, var(--dot)      1.4px, transparent 1.8px),
+    radial-gradient(circle at 14px 14px, var(--dot-soft) 1px, transparent 1.4px);
+  background-size: 28px 28px, 28px 28px;
+  opacity: 0.95;
+}
+/* Warped copy of the dot grid, sitting on top of the static one and
+   masked to a circle around the cursor. Only this layer has the SVG
+   liquid filter, so only dots inside the cursor radius appear to warp;
+   everywhere else the static layer shows through unchanged.
+   --cx / --cy = cursor position (px), --r = warp radius. */
+.bg__dots--warp {
+  filter: url(#liquid);
+  -webkit-mask-image: radial-gradient(
+    circle var(--r, 180px) at var(--cx, 50vw) var(--cy, 50vh),
+    #000 0%,
+    rgba(0,0,0,0.85) 55%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    circle var(--r, 180px) at var(--cx, 50vw) var(--cy, 50vh),
+    #000 0%,
+    rgba(0,0,0,0.85) 55%,
+    transparent 100%
+  );
+}
+
+.lens {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  transform: translate3d(var(--lx, 50vw), var(--ly, 50vh), 0) translate(-50%, -50%);
+  will-change: transform;
+  mix-blend-mode: multiply;   /* darkens dots under the lens = "wet" look */
+}
+.lens--1 {                    /* big, slow, soft */
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, var(--lens-1) 0%, transparent 65%);
+  filter: blur(36px);
+}
+.lens--2 {                    /* mid */
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, var(--lens-2) 0%, transparent 70%);
+  filter: blur(22px);
+}
+.lens--3 {                    /* small, snappier, closer to cursor */
+  width: 160px;
+  height: 160px;
+  background: radial-gradient(circle, var(--lens-3) 0%, transparent 78%);
+  filter: blur(10px);
+}
+
+/* Glassify UI pills so they sit on the watery bg like real glass. */
+.menu, .contact, .panel__inner {
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
 }
 
 a { color: inherit; text-decoration: none; }
-button { background: none; border: none; color: inherit; font: inherit; cursor: none; }
-
-/* crosshair --------------------------------------------------------------- */
-/* two thin rules that span the viewport and follow the cursor with damping.
-   the damping is what makes the cursor feel like it "falls into" the
-   intersection point instead of tracking 1:1 with the pointer. */
-.crosshair {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 50;
-  /* --x / --y    -> integer px, used by the 1px rules so they stay crisp.
-     --xf / --yf  -> float px, used by the dot so it can sub-pixel-glide. */
-  --x: 50vw;
-  --y: 50vh;
-  --xf: 50vw;
-  --yf: 50vh;
-}
-.crosshair__h,
-.crosshair__v {
-  position: absolute;
-  background: var(--rule);
-}
-.crosshair__h {
-  left: 0;
-  right: 0;
-  top: var(--y);
-  height: 1px;
-  transform: translateY(-0.5px);
-}
-.crosshair__v {
-  top: 0;
-  bottom: 0;
-  left: var(--x);
-  width: 1px;
-  transform: translateX(-0.5px);
-}
-.crosshair__dot {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--rule);
-  /* translate3d on a float position = sub-pixel smooth, GPU-composited */
-  transform: translate3d(var(--xf), var(--yf), 0) translate(-50%, -50%);
-  will-change: transform;
-}
+button { background: none; border: none; color: inherit; font: inherit; cursor: pointer; }
 
 /* corners ----------------------------------------------------------------- */
 header.tl {
@@ -93,44 +119,16 @@ header.tl {
 }
 .wordmark {
   font-family: var(--font-sans);
-  font-size: 15px;
-  letter-spacing: -0.02em;
+  font-size: 22px;
+  letter-spacing: -0.025em;
+  font-weight: 500;
+  opacity: 0;
+  animation: wordmark-in 900ms cubic-bezier(.22, 1, .36, 1) 120ms forwards;
 }
-
-.tr {
-  position: fixed;
-  top: 14px;
-  right: 22px;
-  z-index: 10;
+@keyframes wordmark-in {
+  from { opacity: 0; transform: translateY(-4px); filter: blur(6px); }
+  to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
 }
-#invert {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 6px;
-  background: var(--pill-bg);
-  border: 1px solid var(--pill-br);
-  border-radius: 999px;
-  backdrop-filter: blur(6px);
-  transition: transform 120ms ease;
-}
-#invert:hover { transform: scale(1.04); }
-#invert:active { transform: scale(0.97); }
-.invert__dot {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 1px solid var(--fg);
-  transition: background 200ms ease, transform 200ms ease;
-}
-.invert__dot--a { background: var(--fg); }
-.invert__dot--b { background: transparent; }
-/* When inverted (data-theme=dark), the filled/empty roles flip via the
-   variables themselves, so no extra CSS needed — but we animate a tiny
-   rotate for tactile feedback. */
-#invert[aria-pressed="true"] { transform: rotate(180deg); }
-#invert[aria-pressed="true"]:hover { transform: rotate(180deg) scale(1.04); }
 
 /* left column ------------------------------------------------------------- */
 .left {

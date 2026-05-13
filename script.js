@@ -1,105 +1,86 @@
-// Crosshair cursor — spring follow (liquid feel) + invert toggle.
+// Menu + popup + contact-key.
 //
-// Why a spring instead of a plain lerp:
-//   lerp moves toward target by EASE per frame. Smooth, but uniformly
-//   "soft." A spring adds velocity that builds and decays. It overshoots
-//   slightly when you stop, then settles. That tiny overshoot is what
-//   makes the cursor feel liquid rather than damped.
-//
-// No libraries. ~40 lines of physics.
+// Click a menu item -> popup scales out from that item.
+// Esc / X / outside click -> close.
 
 (function () {
-  const root = document.querySelector(".crosshair");
-  if (!root) return;
-
-  // Position state.
+  // Watery cursor-driven background --------------------------------------
+  // Three blurred lenses follow the pointer at different spring rates.
+  // Cursor speed pushes the SVG feDisplacementMap scale up momentarily,
+  // so fast moves "splash" the dot grid; idle = gentle drift only.
   const target  = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-  const current = { x: target.x, y: target.y };
-  const vel     = { x: 0, y: 0 };
+  const lastT   = { x: target.x, y: target.y };
+  let speed     = 0;        // smoothed pointer speed (px/frame)
 
-  // Spring tuning.
-  //   STIFFNESS — how hard the spring pulls toward target each frame.
-  //   DAMPING   — how much velocity decays each frame (1 = no decay).
-  // Try 0.22 / 0.72 for snappier, 0.12 / 0.82 for floatier.
-  const STIFFNESS = 0.18;
-  const DAMPING   = 0.78;
+  const lenses = [
+    { el: document.querySelector(".lens--1"), x: target.x, y: target.y, vx: 0, vy: 0, k: 0.040, d: 0.84 },
+    { el: document.querySelector(".lens--2"), x: target.x, y: target.y, vx: 0, vy: 0, k: 0.075, d: 0.80 },
+    { el: document.querySelector(".lens--3"), x: target.x, y: target.y, vx: 0, vy: 0, k: 0.130, d: 0.78 }
+  ];
 
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const disp = document.getElementById("liquidDisp");
+  const warpDots = document.querySelector(".bg__dots--warp");
+  const DISP_BASE = 18;     // idle warp
+  const DISP_MAX  = 60;     // max warp when whipping the pointer
+  const R_BASE = 160;       // idle warp radius (px) — only dots inside this circle around the cursor warp
+  const R_MAX  = 320;       // max radius when whipping the pointer
 
-  function move(e) {
+  function onMove(e) {
     target.x = e.clientX;
     target.y = e.clientY;
   }
+  window.addEventListener("pointermove", onMove, { passive: true });
+  window.addEventListener("mousemove",   onMove, { passive: true });
 
-  // pointermove covers mouse + pen + touch in modern browsers. We also
-  // attach mousemove as a belt-and-suspenders fallback for older WebKit.
-  window.addEventListener("pointermove", move, { passive: true });
-  window.addEventListener("mousemove",   move, { passive: true });
+  function bgTick() {
+    // Instantaneous pointer delta -> smoothed speed.
+    const dx = target.x - lastT.x;
+    const dy = target.y - lastT.y;
+    const inst = Math.sqrt(dx * dx + dy * dy);
+    lastT.x = target.x; lastT.y = target.y;
+    speed += (inst - speed) * 0.15;        // low-pass filter
 
-  // Seed the position to the first real pointer event so there is no
-  // initial spring-from-center on page load.
-  window.addEventListener("pointerover", (e) => {
-    current.x = target.x = e.clientX;
-    current.y = target.y = e.clientY;
-    vel.x = vel.y = 0;
-  }, { once: true, passive: true });
-
-  function tick() {
-    if (reduced) {
-      // Snap with no animation.
-      current.x = target.x;
-      current.y = target.y;
-    } else {
-      // Spring step.
-      vel.x = (vel.x + (target.x - current.x) * STIFFNESS) * DAMPING;
-      vel.y = (vel.y + (target.y - current.y) * STIFFNESS) * DAMPING;
-      current.x += vel.x;
-      current.y += vel.y;
+    // Map speed -> displacement scale. Cap so it doesn't blow up.
+    if (disp) {
+      const s = Math.min(DISP_BASE + speed * 1.8, DISP_MAX);
+      disp.setAttribute("scale", s.toFixed(2));
     }
 
-    // 1px rules need to land on a whole device row to stay crisp.
-    // The dot can live on sub-pixels because it's bigger than 1px.
-    const xi = Math.round(current.x);
-    const yi = Math.round(current.y);
-    root.style.setProperty("--x", xi + "px");
-    root.style.setProperty("--y", yi + "px");
-    root.style.setProperty("--xf", current.x + "px");
-    root.style.setProperty("--yf", current.y + "px");
+    // Move the warp mask to the cursor, and grow the radius with speed so
+    // fast moves splash a wider area. Only dots inside this radius warp.
+    if (warpDots) {
+      const r = Math.min(R_BASE + speed * 6, R_MAX);
+      warpDots.style.setProperty("--cx", target.x + "px");
+      warpDots.style.setProperty("--cy", target.y + "px");
+      warpDots.style.setProperty("--r",  r.toFixed(1) + "px");
+    }
 
-    requestAnimationFrame(tick);
-  }
-  requestAnimationFrame(tick);
+    // Lens springs.
+    for (const L of lenses) {
+      if (!L.el) continue;
+      L.vx = (L.vx + (target.x - L.x) * L.k) * L.d;
+      L.vy = (L.vy + (target.y - L.y) * L.k) * L.d;
+      L.x += L.vx;
+      L.y += L.vy;
+      L.el.style.setProperty("--lx", L.x + "px");
+      L.el.style.setProperty("--ly", L.y + "px");
+    }
 
-  // Invert toggle. Swaps fg/bg by flipping a data attribute on <html>.
-  // No filter() — `filter: invert()` also inverts images/video, which
-  // looks broken once you put real content in the stage. data-theme is
-  // cleaner and respects the CSS variables in style.css.
-  const invertBtn = document.getElementById("invert");
-  function applyTheme(name) {
-    document.documentElement.setAttribute("data-theme", name);
-    if (invertBtn) invertBtn.setAttribute("aria-pressed", name === "dark" ? "true" : "false");
-    try { localStorage.setItem("theme", name); } catch {}
+    requestAnimationFrame(bgTick);
   }
-  applyTheme(localStorage.getItem("theme") || "light");
-  if (invertBtn) {
-    invertBtn.addEventListener("click", () => {
-      const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
-      applyTheme(next);
-    });
-  }
+  requestAnimationFrame(bgTick);
 
   // Press C to fire the contact action.
   window.addEventListener("keydown", (e) => {
     if (e.key && e.key.toLowerCase() === "c" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      // ignore C while typing in a field
+      const t = e.target;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
       window.location.href = "mailto:you@example.com";
     }
   });
 
   // Menu + panel ----------------------------------------------------------
-  // Click a menu item -> panel scales out from that item's position.
-  // The transform-origin is the center of the clicked pill, written as
-  // CSS variables on the panel. Close on Esc, the X button, or click
-  // on the panel backdrop (outside the inner card).
   const panel      = document.getElementById("panel");
   const backdrop   = document.getElementById("panel-backdrop");
   const panelTitle = document.getElementById("panel-title");
@@ -146,7 +127,6 @@
     const data = PANEL_CONTENT[key];
     if (!data) return;
 
-    // Origin for the scale animation = center of the clicked menu item.
     if (originEl) {
       const r = originEl.getBoundingClientRect();
       const ox = r.left + r.width  / 2;
@@ -160,8 +140,6 @@
 
     panel.hidden = false;
     if (backdrop) backdrop.hidden = false;
-    // next frame so the browser registers the [hidden]->visible state
-    // change before applying the open class, so the transition runs.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => panel.classList.add("is-open"));
     });
@@ -170,7 +148,6 @@
   function closePanel() {
     if (!panel) return;
     panel.classList.remove("is-open");
-    // hide after the transition finishes so it can't be tabbed into
     const onEnd = () => {
       panel.hidden = true;
       if (backdrop) backdrop.hidden = true;

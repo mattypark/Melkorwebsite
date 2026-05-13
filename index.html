@@ -7,25 +7,38 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- crosshair: two full-viewport lines forming a + at the (eased) cursor position -->
-  <div class="crosshair" aria-hidden="true">
-    <div class="crosshair__h"></div>
-    <div class="crosshair__v"></div>
-    <div class="crosshair__dot"></div>
+
+  <!-- Background: blue dots on white, warped continuously by SVG turbulence,
+       plus three soft glass lenses that follow the cursor at different lag
+       rates for a watery, layered feel. Whole thing is decorative. -->
+  <div class="bg" aria-hidden="true">
+    <div class="bg__dots"></div>
+    <div class="bg__dots bg__dots--warp"></div>
+    <div class="lens lens--1"></div>
+    <div class="lens lens--2"></div>
+    <div class="lens lens--3"></div>
   </div>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <!-- The dot grid is warped by turbulence noise. baseFrequency animates
+           slowly so the warp drifts on its own; displacement scale also
+           animates so the warp "breathes." script.js can drive `scale`
+           higher when the cursor is moving fast for a watery push. -->
+      <filter id="liquid" x="-10%" y="-10%" width="120%" height="120%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.009 0.012" numOctaves="2" seed="4" result="noise">
+          <animate attributeName="baseFrequency" dur="26s"
+                   values="0.008 0.011; 0.014 0.017; 0.008 0.011" repeatCount="indefinite" />
+        </feTurbulence>
+        <feDisplacementMap id="liquidDisp" in="SourceGraphic" in2="noise" scale="22" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </defs>
+  </svg>
 
   <!-- top-left: wordmark -->
   <header class="tl">
     <a class="wordmark" href="/">Melkor</a>
   </header>
-
-  <!-- top-right: invert toggle (swaps fg/bg) -->
-  <div class="tr">
-    <button id="invert" type="button" aria-label="invert colors" aria-pressed="false">
-      <span class="invert__dot invert__dot--a"></span>
-      <span class="invert__dot invert__dot--b"></span>
-    </button>
-  </div>
 
   <!-- left column: menu + contact key hint -->
   <aside class="left">
