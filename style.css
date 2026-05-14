@@ -101,6 +101,73 @@ body {
   filter: blur(10px);
 }
 
+/* Liquid-glass orbs ------------------------------------------------------ */
+/* The orb body is a perfect circle with a soft tinted fill. The glass-ness
+   comes from layering:
+     1. backdrop-filter on the orb itself: blurs + saturates whatever sits
+        behind it (the dot grid, the lenses) -> refraction look.
+     2. ::before pseudo = specular highlight arc on the top edge, like a
+        light source above and to the left.
+     3. ::after pseudo = inset rim shadow on the bottom edge -> the glass
+        feels thick, not flat.
+     4. outer box-shadow = soft drop shadow under the orb -> lifted off
+        the page like a real object.
+   Position is driven by --gx / --gy CSS variables that script.js writes
+   each frame, with heavy damping so the orbs drift behind the cursor. */
+.glass {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translate3d(var(--gx, 50vw), var(--gy, 50vh), 0) translate(-50%, -50%);
+  will-change: transform;
+  opacity: 0.40;             /* recede further into the bg */
+  /* Softer, near-colorless glass. Keep blur for refraction but drop the
+     blue tint so the orb reads as clear glass, not a blue bubble. */
+  backdrop-filter: blur(10px) saturate(110%) brightness(1.02);
+  -webkit-backdrop-filter: blur(10px) saturate(110%) brightness(1.02);
+  background:
+    radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.04) 40%, transparent 75%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    /* outer lift — softer, smaller, less blue */
+    0 18px 36px -16px rgba(60, 60, 90, 0.12),
+    0 6px 18px -10px rgba(60, 60, 90, 0.08),
+    /* top inner highlight */
+    inset 0 1px 1px rgba(255, 255, 255, 0.30),
+    /* bottom inner rim — neutral, not blue */
+    inset 0 -6px 12px -6px rgba(60, 60, 90, 0.08),
+    /* faint inner glow */
+    inset 0 0 20px rgba(255, 255, 255, 0.06);
+}
+/* Specular highlight arc — bright crescent on the top edge. clip-path
+   to a thin arc so it reads as a glint, not a full white circle. */
+.glass::before {
+  content: "";
+  position: absolute;
+  inset: 4%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse 70% 40% at 50% 8%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.0) 60%);
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+/* Soft underside reflection — neutral white bounce, not blue, so the
+   orb reads as clear glass. */
+.glass::after {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse 60% 30% at 50% 92%, rgba(255, 255, 255, 0.18) 0%, transparent 60%);
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+.glass--a {
+  width: 220px;
+  height: 220px;
+}
+
 /* Glassify UI pills so they sit on the watery bg like real glass. */
 .menu, .contact, .panel__inner {
   backdrop-filter: blur(14px) saturate(150%);

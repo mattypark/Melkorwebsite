@@ -18,6 +18,12 @@
     { el: document.querySelector(".lens--3"), x: target.x, y: target.y, vx: 0, vy: 0, k: 0.130, d: 0.78 }
   ];
 
+  // Liquid-glass orb. Snappy spring (high k, low d) so the orb sits
+  // centered under the cursor while still feeling like it has weight.
+  const glassOrbs = [
+    { el: document.querySelector(".glass--a"), x: target.x, y: target.y, vx: 0, vy: 0, k: 0.22, d: 0.62 }
+  ];
+
   const disp = document.getElementById("liquidDisp");
   const warpDots = document.querySelector(".bg__dots--warp");
   const DISP_BASE = 18;     // idle warp
@@ -64,6 +70,17 @@
       L.y += L.vy;
       L.el.style.setProperty("--lx", L.x + "px");
       L.el.style.setProperty("--ly", L.y + "px");
+    }
+
+    // Glass-orb spring. Target = cursor (centered, no offset, no drift).
+    for (const G of glassOrbs) {
+      if (!G.el) continue;
+      G.vx = (G.vx + (target.x - G.x) * G.k) * G.d;
+      G.vy = (G.vy + (target.y - G.y) * G.k) * G.d;
+      G.x += G.vx;
+      G.y += G.vy;
+      G.el.style.setProperty("--gx", G.x + "px");
+      G.el.style.setProperty("--gy", G.y + "px");
     }
 
     requestAnimationFrame(bgTick);

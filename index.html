@@ -17,6 +17,13 @@
     <div class="lens lens--1"></div>
     <div class="lens lens--2"></div>
     <div class="lens lens--3"></div>
+
+    <!-- Liquid-glass orb. Tracks the cursor with light damping so the
+         center sits under the pointer but the orb still feels heavy.
+         Glass material = backdrop-filter (blur + saturate) for refraction
+         of the dots underneath, plus inset highlight/shadow + outer drop
+         shadow to read as a real lifted glass disc. -->
+    <div class="glass glass--a"></div>
   </div>
 
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
