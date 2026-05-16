@@ -8,39 +8,10 @@
 </head>
 <body>
 
-  <!-- Background: blue dots on white, warped continuously by SVG turbulence,
-       plus three soft glass lenses that follow the cursor at different lag
-       rates for a watery, layered feel. Whole thing is decorative. -->
-  <div class="bg" aria-hidden="true">
-    <div class="bg__dots"></div>
-    <div class="bg__dots bg__dots--warp"></div>
-    <div class="lens lens--1"></div>
-    <div class="lens lens--2"></div>
-    <div class="lens lens--3"></div>
-
-    <!-- Liquid-glass orb. Tracks the cursor with light damping so the
-         center sits under the pointer but the orb still feels heavy.
-         Glass material = backdrop-filter (blur + saturate) for refraction
-         of the dots underneath, plus inset highlight/shadow + outer drop
-         shadow to read as a real lifted glass disc. -->
-    <div class="glass glass--a"></div>
-  </div>
-
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <defs>
-      <!-- The dot grid is warped by turbulence noise. baseFrequency animates
-           slowly so the warp drifts on its own; displacement scale also
-           animates so the warp "breathes." script.js can drive `scale`
-           higher when the cursor is moving fast for a watery push. -->
-      <filter id="liquid" x="-10%" y="-10%" width="120%" height="120%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.009 0.012" numOctaves="2" seed="4" result="noise">
-          <animate attributeName="baseFrequency" dur="26s"
-                   values="0.008 0.011; 0.014 0.017; 0.008 0.011" repeatCount="indefinite" />
-        </feTurbulence>
-        <feDisplacementMap id="liquidDisp" in="SourceGraphic" in2="noise" scale="22" xChannelSelector="R" yChannelSelector="G" />
-      </filter>
-    </defs>
-  </svg>
+  <!-- Background: canvas of 1s and 0s. Each cell flips occasionally and
+       has its own slow alpha pulse so the whole field shimmers/changes
+       without ever scrolling. Decorative only. -->
+  <canvas id="bg-canvas" class="bg-canvas" aria-hidden="true"></canvas>
 
   <!-- top-left: wordmark -->
   <header class="tl">
@@ -51,10 +22,9 @@
   <aside class="left">
     <nav class="menu" aria-label="main">
       <ul>
-        <li><button class="menu__item" data-panel="products"   type="button">Products</button></li>
-        <li><button class="menu__item" data-panel="enterprise" type="button">Enterprise</button></li>
-        <li><button class="menu__item" data-panel="philosophy" type="button">Philosophy</button></li>
-        <li><button class="menu__item" data-panel="demo"       type="button">Request a Demo</button></li>
+        <li><button class="menu__item" data-action="products"   type="button">Products</button></li>
+        <li><button class="menu__item" data-action="philosophy" type="button">Philosophy</button></li>
+        <li><button class="menu__item" data-action="demo"       type="button">Request a Demo</button></li>
       </ul>
     </nav>
     <button class="contact" type="button">
@@ -63,17 +33,60 @@
     </button>
   </aside>
 
-  <!-- popup: small box near the menu. Content swaps based on which menu
-       item was clicked. The backdrop is transparent (no dim) but catches
-       outside clicks so the popup feels lightweight, not modal. -->
+  <!-- Products view: 3 cards pushed to the right side. Each card can be
+       expanded; expanding one shrinks the other two. Click X to close. -->
+  <aside class="products" id="products" hidden>
+    <button class="products__close" id="products-close" type="button" aria-label="close">&times;</button>
+    <div class="product-card" data-product="a">
+      <button class="product-card__expand" type="button" aria-label="expand">+</button>
+      <div class="product-card__head">
+        <h3>Product A</h3>
+        <p class="product-card__teaser">One-line description of Product A.</p>
+      </div>
+      <div class="product-card__detail">
+        <p>Longer description. What it does, who it's for, why it matters. Two or three short paragraphs is the right length here.</p>
+        <p>Edit me in <code>index.html</code> when you have real copy.</p>
+      </div>
+    </div>
+    <div class="product-card" data-product="b">
+      <button class="product-card__expand" type="button" aria-label="expand">+</button>
+      <div class="product-card__head">
+        <h3>Product B</h3>
+        <p class="product-card__teaser">One-line description of Product B.</p>
+      </div>
+      <div class="product-card__detail">
+        <p>Longer description for Product B. Replace with the actual pitch.</p>
+      </div>
+    </div>
+    <div class="product-card" data-product="c">
+      <button class="product-card__expand" type="button" aria-label="expand">+</button>
+      <div class="product-card__head">
+        <h3>Product C</h3>
+        <p class="product-card__teaser">One-line description of Product C.</p>
+      </div>
+      <div class="product-card__detail">
+        <p>Longer description for Product C. Replace with the actual pitch.</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Philosophy view: in-page overlay that leaves the left menu visible.
+       The text scrambles from 1s/0s into the real philosophy lines. -->
+  <aside class="philosophy" id="philosophy" hidden>
+    <button class="philosophy__close" id="philosophy-close" type="button" aria-label="close">&times;</button>
+    <div class="philosophy__inner">
+      <div class="philosophy__tab">Philosophy</div>
+      <div class="philosophy__text" id="phil-text" aria-live="polite"></div>
+    </div>
+  </aside>
+
+  <!-- Generic popup used by Request a Demo. Smaller than full-screen. -->
   <div class="panel-backdrop" id="panel-backdrop" hidden></div>
   <aside class="panel" id="panel" role="dialog" aria-modal="false" aria-labelledby="panel-title" hidden>
     <div class="panel__inner">
-      <div class="panel__tab" id="panel-title">Philosophy</div>
+      <div class="panel__tab" id="panel-title">Request a Demo</div>
       <button class="panel__close" id="panel-close" type="button" aria-label="close">&times;</button>
-      <div class="panel__body" id="panel-body">
-        <!-- content injected by script.js based on data-panel -->
-      </div>
+      <div class="panel__body" id="panel-body"></div>
     </div>
   </aside>
 
@@ -84,9 +97,6 @@
     <a href="https://github.com/" target="_blank" rel="noopener">GitHub</a>
   </nav>
 
-  <!-- center placeholder where the original has its sculpture.
-       Drop in your own thing later: shader, image, mesh, anything.
-       Left empty on purpose. -->
   <main class="stage" aria-hidden="true"></main>
 
   <script src="script.js" defer></script>

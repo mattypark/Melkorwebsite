@@ -1,103 +1,213 @@
-// Menu + popup + contact-key.
+// Melkor — bg canvas of 1s/0s + menu actions (products view, philosophy
+// page nav, demo form popup) + C key contact shortcut.
 //
-// Click a menu item -> popup scales out from that item.
-// Esc / X / outside click -> close.
+// No external deps. All animation runs in a single rAF loop.
 
 (function () {
-  // Watery cursor-driven background --------------------------------------
-  // Three blurred lenses follow the pointer at different spring rates.
-  // Cursor speed pushes the SVG feDisplacementMap scale up momentarily,
-  // so fast moves "splash" the dot grid; idle = gentle drift only.
-  const target  = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-  const lastT   = { x: target.x, y: target.y };
-  let speed     = 0;        // smoothed pointer speed (px/frame)
+  // ---------------------------------------------------------------------
+  // Background: a grid of 1s and 0s drawn on a canvas. Each cell has a
+  // slow alpha pulse phase so the whole field shimmers, and each cell
+  // has a small per-frame chance of flipping 0<->1 so the field is
+  // visibly "changing" without ever scrolling.
+  // ---------------------------------------------------------------------
+  const bgCanvas = document.getElementById("bg-canvas");
+  const bgCtx    = bgCanvas.getContext("2d");
+  const CELL     = 22;     // px between cells
+  const FONT_PX  = 11;
+  const DPR      = Math.min(window.devicePixelRatio || 1, 2);
+  let cols = 0, rows = 0;
+  let cells = [];          // flat array, length = cols*rows
 
-  const lenses = [
-    { el: document.querySelector(".lens--1"), x: target.x, y: target.y, vx: 0, vy: 0, k: 0.040, d: 0.84 },
-    { el: document.querySelector(".lens--2"), x: target.x, y: target.y, vx: 0, vy: 0, k: 0.075, d: 0.80 },
-    { el: document.querySelector(".lens--3"), x: target.x, y: target.y, vx: 0, vy: 0, k: 0.130, d: 0.78 }
-  ];
-
-  // Liquid-glass orb. Snappy spring (high k, low d) so the orb sits
-  // centered under the cursor while still feeling like it has weight.
-  const glassOrbs = [
-    { el: document.querySelector(".glass--a"), x: target.x, y: target.y, vx: 0, vy: 0, k: 0.22, d: 0.62 }
-  ];
-
-  const disp = document.getElementById("liquidDisp");
-  const warpDots = document.querySelector(".bg__dots--warp");
-  const DISP_BASE = 18;     // idle warp
-  const DISP_MAX  = 60;     // max warp when whipping the pointer
-  const R_BASE = 160;       // idle warp radius (px) — only dots inside this circle around the cursor warp
-  const R_MAX  = 320;       // max radius when whipping the pointer
-
-  function onMove(e) {
-    target.x = e.clientX;
-    target.y = e.clientY;
+  function bgResize() {
+    bgCanvas.width        = window.innerWidth  * DPR;
+    bgCanvas.height       = window.innerHeight * DPR;
+    bgCanvas.style.width  = window.innerWidth  + "px";
+    bgCanvas.style.height = window.innerHeight + "px";
+    bgCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    cols = Math.ceil(window.innerWidth  / CELL) + 1;
+    rows = Math.ceil(window.innerHeight / CELL) + 1;
+    cells = new Array(cols * rows);
+    for (let i = 0; i < cells.length; i++) {
+      cells[i] = {
+        v: Math.random() < 0.5 ? "0" : "1",
+        p: Math.random() * Math.PI * 2          // per-cell pulse phase
+      };
+    }
   }
-  window.addEventListener("pointermove", onMove, { passive: true });
-  window.addEventListener("mousemove",   onMove, { passive: true });
+  bgResize();
+  window.addEventListener("resize", bgResize);
 
-  function bgTick() {
-    // Instantaneous pointer delta -> smoothed speed.
-    const dx = target.x - lastT.x;
-    const dy = target.y - lastT.y;
-    const inst = Math.sqrt(dx * dx + dy * dy);
-    lastT.x = target.x; lastT.y = target.y;
-    speed += (inst - speed) * 0.15;        // low-pass filter
-
-    // Map speed -> displacement scale. Cap so it doesn't blow up.
-    if (disp) {
-      const s = Math.min(DISP_BASE + speed * 1.8, DISP_MAX);
-      disp.setAttribute("scale", s.toFixed(2));
+  function bgFrame(t) {
+    bgCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    bgCtx.font = FONT_PX + 'px ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace';
+    bgCtx.textAlign = "center";
+    bgCtx.textBaseline = "middle";
+    const time = t * 0.0008;
+    for (let r = 0; r < rows; r++) {
+      const y = r * CELL + CELL / 2;
+      for (let c = 0; c < cols; c++) {
+        const cell = cells[r * cols + c];
+        // small flip chance: keeps the field "changing"
+        if (Math.random() < 0.0015) cell.v = cell.v === "0" ? "1" : "0";
+        // alpha breathing per cell
+        const a = 0.18 + Math.sin(time + cell.p) * 0.10;
+        bgCtx.fillStyle = "rgba(45, 92, 220, " + a.toFixed(3) + ")";
+        bgCtx.fillText(cell.v, c * CELL + CELL / 2, y);
+      }
     }
-
-    // Move the warp mask to the cursor, and grow the radius with speed so
-    // fast moves splash a wider area. Only dots inside this radius warp.
-    if (warpDots) {
-      const r = Math.min(R_BASE + speed * 6, R_MAX);
-      warpDots.style.setProperty("--cx", target.x + "px");
-      warpDots.style.setProperty("--cy", target.y + "px");
-      warpDots.style.setProperty("--r",  r.toFixed(1) + "px");
-    }
-
-    // Lens springs.
-    for (const L of lenses) {
-      if (!L.el) continue;
-      L.vx = (L.vx + (target.x - L.x) * L.k) * L.d;
-      L.vy = (L.vy + (target.y - L.y) * L.k) * L.d;
-      L.x += L.vx;
-      L.y += L.vy;
-      L.el.style.setProperty("--lx", L.x + "px");
-      L.el.style.setProperty("--ly", L.y + "px");
-    }
-
-    // Glass-orb spring. Target = cursor (centered, no offset, no drift).
-    for (const G of glassOrbs) {
-      if (!G.el) continue;
-      G.vx = (G.vx + (target.x - G.x) * G.k) * G.d;
-      G.vy = (G.vy + (target.y - G.y) * G.k) * G.d;
-      G.x += G.vx;
-      G.y += G.vy;
-      G.el.style.setProperty("--gx", G.x + "px");
-      G.el.style.setProperty("--gy", G.y + "px");
-    }
-
-    requestAnimationFrame(bgTick);
+    requestAnimationFrame(bgFrame);
   }
-  requestAnimationFrame(bgTick);
+  requestAnimationFrame(bgFrame);
 
-  // Press C to fire the contact action.
+  // ---------------------------------------------------------------------
+  // Press C -> fire contact action (ignore when typing in a field).
+  // ---------------------------------------------------------------------
   window.addEventListener("keydown", (e) => {
     if (e.key && e.key.toLowerCase() === "c" && !e.metaKey && !e.ctrlKey && !e.altKey) {
-      // ignore C while typing in a field
       const t = e.target;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
-      window.location.href = "mailto:you@example.com";
+      window.location.href = "mailto:hello@example.com";
     }
   });
 
-  // Menu + panel ----------------------------------------------------------
+  // ---------------------------------------------------------------------
+  // Products view: 3 cards on the right. Click + on any card to expand
+  // it (the other two shrink via flex). Click again to collapse.
+  // ---------------------------------------------------------------------
+  const products      = document.getElementById("products");
+  const productsClose = document.getElementById("products-close");
+
+  function openProducts() {
+    if (!products) return;
+    products.hidden = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => products.classList.add("is-open"));
+    });
+  }
+  function closeProducts() {
+    if (!products) return;
+    products.classList.remove("is-open");
+    // collapse any expanded card so it resets next open
+    products.classList.remove("has-expanded");
+    products.querySelectorAll(".product-card.is-expanded").forEach((c) => c.classList.remove("is-expanded"));
+    const onEnd = () => {
+      if (!products.classList.contains("is-open")) products.hidden = true;
+      products.removeEventListener("transitionend", onEnd);
+    };
+    products.addEventListener("transitionend", onEnd);
+  }
+  if (productsClose) productsClose.addEventListener("click", closeProducts);
+
+  // Card expand buttons.
+  document.querySelectorAll(".product-card__expand").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const card = btn.closest(".product-card");
+      if (!card) return;
+      const willExpand = !card.classList.contains("is-expanded");
+      // only one expanded at a time
+      products.querySelectorAll(".product-card.is-expanded").forEach((c) => c.classList.remove("is-expanded"));
+      if (willExpand) {
+        card.classList.add("is-expanded");
+        products.classList.add("has-expanded");
+      } else {
+        products.classList.remove("has-expanded");
+      }
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // Philosophy view: in-page overlay. Text inside scrambles between 0/1
+  // then locks to the real character (left-to-right reveal). Menu on
+  // the left stays visible the whole time.
+  // ---------------------------------------------------------------------
+  const philosophy      = document.getElementById("philosophy");
+  const philosophyClose = document.getElementById("philosophy-close");
+  const philText        = document.getElementById("phil-text");
+
+  const PHILOSOPHY = [
+    "We don't build to occupy meetings.",
+    "We don't ship to fill quarters.",
+    "",
+    "If a thing doesn't move someone, it isn't done.",
+    "If a thing isn't honest, we don't ship it.",
+    "",
+    "That is the whole document."
+  ].join("\n");
+
+  let philRaf = 0;
+
+  function startDecode() {
+    if (!philText) return;
+    cancelAnimationFrame(philRaf);
+    philText.innerHTML = "";
+
+    // build one span per non-newline character
+    const spans = [];
+    for (let i = 0; i < PHILOSOPHY.length; i++) {
+      const ch = PHILOSOPHY[i];
+      if (ch === "\n") { philText.appendChild(document.createTextNode("\n")); continue; }
+      const span = document.createElement("span");
+      span.className = "phil__char scramble";
+      span.textContent = ch === " " ? " " : (Math.random() < 0.5 ? "0" : "1");
+      span.dataset.target = ch;
+      philText.appendChild(span);
+      spans.push(span);
+    }
+
+    const startAt   = performance.now() + 200;
+    const perChar   = 24;     // ms between each lock
+    const scrambleD = 500;    // ms scrambling before lock
+    let locked = 0;
+
+    function tick(now) {
+      for (let i = locked; i < spans.length; i++) {
+        const span = spans[i];
+        const t = now - (startAt + i * perChar);
+        if (t < 0) break;
+        if (span.dataset.target === " ") {
+          span.textContent = " ";
+          span.classList.replace("scramble", "locked");
+          if (i === locked) locked++;
+          continue;
+        }
+        if (t < scrambleD) {
+          span.textContent = Math.random() < 0.5 ? "0" : "1";
+        } else {
+          span.textContent = span.dataset.target;
+          span.classList.replace("scramble", "locked");
+          if (i === locked) locked++;
+        }
+      }
+      if (locked < spans.length) philRaf = requestAnimationFrame(tick);
+    }
+    philRaf = requestAnimationFrame(tick);
+  }
+
+  function openPhilosophy() {
+    if (!philosophy) return;
+    philosophy.hidden = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => philosophy.classList.add("is-open"));
+    });
+    startDecode();
+  }
+  function closePhilosophy() {
+    if (!philosophy) return;
+    cancelAnimationFrame(philRaf);
+    philosophy.classList.remove("is-open");
+    const onEnd = () => {
+      if (!philosophy.classList.contains("is-open")) philosophy.hidden = true;
+      philosophy.removeEventListener("transitionend", onEnd);
+    };
+    philosophy.addEventListener("transitionend", onEnd);
+  }
+  if (philosophyClose) philosophyClose.addEventListener("click", closePhilosophy);
+
+  // ---------------------------------------------------------------------
+  // Generic small popup (used by Request a Demo). Reuses the panel infra
+  // from before but now sized as a centered form popup.
+  // ---------------------------------------------------------------------
   const panel      = document.getElementById("panel");
   const backdrop   = document.getElementById("panel-backdrop");
   const panelTitle = document.getElementById("panel-title");
@@ -105,37 +215,28 @@
   const panelClose = document.getElementById("panel-close");
 
   const PANEL_CONTENT = {
-    products: {
-      title: "Products",
-      html:  `<h2>Products</h2>
-              <p>Replace this with what you ship. One paragraph per product is enough on a landing page; deeper detail belongs on its own page.</p>
-              <ul>
-                <li>Product A — one-line description.</li>
-                <li>Product B — one-line description.</li>
-                <li>Product C — one-line description.</li>
-              </ul>`
-    },
-    enterprise: {
-      title: "Enterprise",
-      html:  `<h2>Enterprise</h2>
-              <p>What you offer to larger customers. Security posture, deployment options, support, billing terms. Keep it concrete.</p>
-              <ul>
-                <li>SSO + SCIM.</li>
-                <li>Self-hosted or private cloud.</li>
-                <li>Dedicated support engineer.</li>
-              </ul>`
-    },
-    philosophy: {
-      title: "Philosophy",
-      html:  `<h2>Philosophy</h2>
-              <p>What you believe about the work, said plainly. Not a mission statement. The opinions that decide what you build and what you refuse to build.</p>
-              <p>Three to five short paragraphs is the right length.</p>`
-    },
     demo: {
       title: "Request a Demo",
       html:  `<h2>Request a Demo</h2>
-              <p>Drop in a form, a Cal.com embed, or a single email link. Don't overbuild this — friction here costs you meetings.</p>
-              <p><a href="mailto:you@example.com" style="text-decoration: underline;">you@example.com</a></p>`
+              <p>Leave your details. We'll send a calendar link.</p>
+              <form class="demo-form" id="demo-form" novalidate>
+                <label>Name
+                  <input type="text" name="name" required />
+                </label>
+                <label>Email
+                  <input type="email" name="email" required />
+                </label>
+                <label>Company
+                  <input type="text" name="company" />
+                </label>
+                <label>What do you want to see?
+                  <textarea name="message" rows="3"></textarea>
+                </label>
+                <div class="demo-form__row">
+                  <button class="demo-form__submit" type="submit">Send</button>
+                  <span class="demo-form__msg" id="demo-msg"></span>
+                </div>
+              </form>`
     }
   };
 
@@ -146,10 +247,10 @@
 
     if (originEl) {
       const r = originEl.getBoundingClientRect();
-      const ox = r.left + r.width  / 2;
-      const oy = r.top  + r.height / 2;
-      panel.style.setProperty("--ox", ox + "px");
-      panel.style.setProperty("--oy", oy + "px");
+      // express origin as a percentage of the viewport so the
+      // transform-origin makes sense across panel translate(-50%,-50%).
+      panel.style.setProperty("--ox", ((r.left + r.width / 2) / window.innerWidth * 100) + "%");
+      panel.style.setProperty("--oy", ((r.top + r.height / 2) / window.innerHeight * 100) + "%");
     }
 
     panelTitle.textContent = data.title;
@@ -160,6 +261,17 @@
     requestAnimationFrame(() => {
       requestAnimationFrame(() => panel.classList.add("is-open"));
     });
+
+    // wire the demo form if present
+    const form = document.getElementById("demo-form");
+    if (form) {
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const msg = document.getElementById("demo-msg");
+        if (msg) msg.textContent = "Sent. We'll be in touch.";
+        form.reset();
+      });
+    }
   }
 
   function closePanel() {
@@ -173,14 +285,29 @@
     panel.addEventListener("transitionend", onEnd);
   }
 
-  document.querySelectorAll(".menu__item").forEach((btn) => {
-    btn.addEventListener("click", () => openPanel(btn.dataset.panel, btn));
-  });
-
   if (panelClose) panelClose.addEventListener("click", closePanel);
   if (backdrop)   backdrop.addEventListener("click", closePanel);
 
+  // ---------------------------------------------------------------------
+  // Menu dispatch: route each menu item to the right behavior.
+  //   Products    -> open products view
+  //   Philosophy  -> navigate to its own page
+  //   Demo        -> open the form popup
+  // ---------------------------------------------------------------------
+  document.querySelectorAll(".menu__item").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const action = btn.dataset.action;
+      if (action === "products")        openProducts();
+      else if (action === "philosophy") openPhilosophy();
+      else if (action === "demo")       openPanel("demo", btn);
+    });
+  });
+
+  // Esc closes whatever's open.
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && panel && !panel.hidden) closePanel();
+    if (e.key !== "Escape") return;
+    if (panel && !panel.hidden) closePanel();
+    if (products && !products.hidden) closeProducts();
+    if (philosophy && !philosophy.hidden) closePhilosophy();
   });
 })();
