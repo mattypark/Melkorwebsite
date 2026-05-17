@@ -70,13 +70,13 @@
     </div>
   </aside>
 
-  <!-- Philosophy view: in-page overlay that leaves the left menu visible.
-       The text scrambles from 1s/0s into the real philosophy lines. -->
-  <aside class="philosophy" id="philosophy" hidden>
-    <button class="philosophy__close" id="philosophy-close" type="button" aria-label="close">&times;</button>
-    <div class="philosophy__inner">
-      <div class="philosophy__tab">Philosophy</div>
-      <div class="philosophy__text" id="phil-text" aria-live="polite"></div>
+  <!-- Request a Demo: small centered popup with a form. -->
+  <div class="panel-backdrop" id="panel-backdrop" hidden></div>
+  <aside class="panel" id="panel" role="dialog" aria-modal="false" aria-labelledby="panel-title" hidden>
+    <div class="panel__inner">
+      <div class="panel__tab" id="panel-title">Request a Demo</div>
+      <button class="panel__close" id="panel-close" type="button" aria-label="close">&times;</button>
+      <div class="panel__body" id="panel-body"></div>
     </div>
   </aside>
 

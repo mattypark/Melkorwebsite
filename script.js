@@ -117,112 +117,85 @@
   });
 
   // ---------------------------------------------------------------------
-  // Philosophy view: in-page overlay. Text inside scrambles between 0/1
-  // then locks to the real character (left-to-right reveal). Menu on
-  // the left stays visible the whole time.
+  // Request a Demo popup: small centered panel with a form.
   // ---------------------------------------------------------------------
-  const philosophy      = document.getElementById("philosophy");
-  const philosophyClose = document.getElementById("philosophy-close");
-  const philText        = document.getElementById("phil-text");
+  const panel      = document.getElementById("panel");
+  const backdrop   = document.getElementById("panel-backdrop");
+  const panelBody  = document.getElementById("panel-body");
+  const panelClose = document.getElementById("panel-close");
 
-  const PHILOSOPHY = [
-    "We don't build to occupy meetings.",
-    "We don't ship to fill quarters.",
-    "",
-    "If a thing doesn't move someone, it isn't done.",
-    "If a thing isn't honest, we don't ship it.",
-    "",
-    "That is the whole document."
-  ].join("\n");
+  const DEMO_HTML = `
+    <h2>Request a Demo</h2>
+    <p>Leave your details. We'll send a calendar link.</p>
+    <form class="demo-form" id="demo-form" novalidate>
+      <label>Name
+        <input type="text" name="name" required />
+      </label>
+      <label>Email
+        <input type="email" name="email" required />
+      </label>
+      <label>Company
+        <input type="text" name="company" />
+      </label>
+      <label>What do you want to see?
+        <textarea name="message" rows="3"></textarea>
+      </label>
+      <div class="demo-form__row">
+        <button class="demo-form__submit" type="submit">Send</button>
+        <span class="demo-form__msg" id="demo-msg"></span>
+      </div>
+    </form>`;
 
-  let philRaf = 0;
-
-  function startDecode() {
-    if (!philText) return;
-    cancelAnimationFrame(philRaf);
-    philText.innerHTML = "";
-
-    // build one span per non-newline character
-    const spans = [];
-    for (let i = 0; i < PHILOSOPHY.length; i++) {
-      const ch = PHILOSOPHY[i];
-      if (ch === "\n") { philText.appendChild(document.createTextNode("\n")); continue; }
-      const span = document.createElement("span");
-      span.className = "phil__char scramble";
-      span.textContent = ch === " " ? " " : (Math.random() < 0.5 ? "0" : "1");
-      span.dataset.target = ch;
-      philText.appendChild(span);
-      spans.push(span);
-    }
-
-    const startAt   = performance.now() + 200;
-    const perChar   = 24;     // ms between each lock
-    const scrambleD = 500;    // ms scrambling before lock
-    let locked = 0;
-
-    function tick(now) {
-      for (let i = locked; i < spans.length; i++) {
-        const span = spans[i];
-        const t = now - (startAt + i * perChar);
-        if (t < 0) break;
-        if (span.dataset.target === " ") {
-          span.textContent = " ";
-          span.classList.replace("scramble", "locked");
-          if (i === locked) locked++;
-          continue;
-        }
-        if (t < scrambleD) {
-          span.textContent = Math.random() < 0.5 ? "0" : "1";
-        } else {
-          span.textContent = span.dataset.target;
-          span.classList.replace("scramble", "locked");
-          if (i === locked) locked++;
-        }
-      }
-      if (locked < spans.length) philRaf = requestAnimationFrame(tick);
-    }
-    philRaf = requestAnimationFrame(tick);
-  }
-
-  function openPhilosophy() {
-    if (!philosophy) return;
-    philosophy.hidden = false;
+  function openPanel() {
+    if (!panel) return;
+    panelBody.innerHTML = DEMO_HTML;
+    panel.hidden = false;
+    if (backdrop) backdrop.hidden = false;
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => philosophy.classList.add("is-open"));
+      requestAnimationFrame(() => panel.classList.add("is-open"));
     });
-    startDecode();
+    const form = document.getElementById("demo-form");
+    if (form) {
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const msg = document.getElementById("demo-msg");
+        if (msg) msg.textContent = "Sent. We'll be in touch.";
+        form.reset();
+      });
+    }
   }
-  function closePhilosophy() {
-    if (!philosophy) return;
-    cancelAnimationFrame(philRaf);
-    philosophy.classList.remove("is-open");
+  function closePanel() {
+    if (!panel) return;
+    panel.classList.remove("is-open");
     const onEnd = () => {
-      if (!philosophy.classList.contains("is-open")) philosophy.hidden = true;
-      philosophy.removeEventListener("transitionend", onEnd);
+      panel.hidden = true;
+      if (backdrop) backdrop.hidden = true;
+      panel.removeEventListener("transitionend", onEnd);
     };
-    philosophy.addEventListener("transitionend", onEnd);
+    panel.addEventListener("transitionend", onEnd);
   }
-  if (philosophyClose) philosophyClose.addEventListener("click", closePhilosophy);
+  if (panelClose) panelClose.addEventListener("click", closePanel);
+  if (backdrop)   backdrop.addEventListener("click", closePanel);
 
   // ---------------------------------------------------------------------
   // Menu dispatch: route each menu item to the right behavior.
   //   Products    -> open products view
-  //   Philosophy  -> open philosophy overlay
-  //   Demo        -> navigate to demo.html
+  //   Philosophy  -> navigate to its own page
+  //   Demo        -> open form popup
   // ---------------------------------------------------------------------
   document.querySelectorAll(".menu__item").forEach((btn) => {
     btn.addEventListener("click", () => {
       const action = btn.dataset.action;
       if (action === "products")        openProducts();
-      else if (action === "philosophy") openPhilosophy();
-      else if (action === "demo")       window.location.href = "demo.html";
+      else if (action === "philosophy") window.location.href = "philosophy.html";
+      else if (action === "demo")       openPanel();
     });
   });
 
   // Esc closes whatever's open.
   window.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
+    if (panel && !panel.hidden) closePanel();
     if (products && !products.hidden) closeProducts();
-    if (philosophy && !philosophy.hidden) closePhilosophy();
   });
 })();

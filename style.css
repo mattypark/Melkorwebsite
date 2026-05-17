@@ -274,45 +274,52 @@ header.tl {
 .product-card__expand:hover { color: var(--fg); background: rgba(255,255,255,0.95); }
 .product-card.is-expanded .product-card__expand { transform: rotate(45deg); }
 
-/* Philosophy view --------------------------------------------------- */
-/* Same right-side overlay geometry as Products so the left menu stays
-   visible. Centered text inside scrambles from 1s/0s into the real
-   philosophy lines (handled in script.js). */
-.philosophy {
+/* Panel backdrop (transparent click-catcher) ------------------------ */
+.panel-backdrop {
   position: fixed;
-  top: 22px;
-  right: 22px;
-  bottom: 22px;
-  left: 320px;
-  z-index: 70;
+  inset: 0;
+  z-index: 65;
+  background: transparent;
+}
+.panel-backdrop[hidden] { display: none; }
+
+/* Panel (Request a Demo) — small centered popup. ------------------- */
+.panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: min(520px, calc(100vw - 44px));
+  max-height: min(620px, calc(100vh - 80px));
+  z-index: 80;
   opacity: 0;
-  transform: translateY(8px);
   pointer-events: none;
-  transition: opacity 280ms ease, transform 320ms cubic-bezier(.22, 1, .36, 1);
+  transform: translate(-50%, -50%) scale(0.92);
+  transform-origin: center;
+  transition: opacity 220ms ease, transform 280ms cubic-bezier(.22, 1, .36, 1);
 }
-.philosophy[hidden] { display: none; }
-.philosophy.is-open {
+.panel[hidden] { display: none; }
+.panel.is-open {
   opacity: 1;
-  transform: translateY(0);
   pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
 }
-.philosophy__inner {
+.panel__inner {
   position: relative;
   width: 100%;
-  height: 100%;
+  max-height: min(620px, calc(100vh - 80px));
   background: var(--card-bg);
   border: 1px solid var(--pill-br);
   border-radius: 18px;
-  padding: 56px 48px 40px;
+  padding: 40px 32px 28px;
   overflow: auto;
+  box-shadow: 0 18px 50px -12px rgba(0,0,0,0.22);
   backdrop-filter: blur(14px) saturate(150%);
   -webkit-backdrop-filter: blur(14px) saturate(150%);
-  box-shadow: 0 14px 48px -10px rgba(0,0,0,0.18);
 }
-.philosophy__tab {
+.panel__tab {
   position: absolute;
   top: -1px;
-  left: 24px;
+  left: 20px;
   transform: translateY(-50%);
   padding: 5px 14px;
   background: var(--bg);
@@ -321,35 +328,30 @@ header.tl {
   font-size: 12px;
   letter-spacing: -0.01em;
 }
-.philosophy__close {
+.panel__close {
   position: absolute;
-  top: 14px;
-  right: 18px;
+  top: 10px;
+  right: 14px;
   width: 28px;
   height: 28px;
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1;
   border-radius: 50%;
   display: grid;
   place-items: center;
   color: var(--muted);
-  z-index: 2;
   transition: color 160ms ease, background 160ms ease;
 }
-.philosophy__close:hover { color: var(--fg); background: rgba(0,0,0,0.06); }
-.philosophy__text {
-  font-family: var(--font-mono);
+.panel__close:hover { color: var(--fg); background: rgba(0,0,0,0.06); }
+.panel__body {
   font-size: 14px;
-  line-height: 1.85;
+  line-height: 1.55;
   color: var(--fg);
-  white-space: pre-wrap;
-  max-width: 620px;
-  margin: 24px auto 0;
 }
-.phil__char.scramble { color: var(--accent); opacity: 0.8; }
-.phil__char.locked   { color: var(--fg); }
+.panel__body h2 { font-size: 20px; margin-bottom: 6px; letter-spacing: -0.02em; font-weight: 500; }
+.panel__body p  { margin-bottom: 18px; color: var(--muted); }
 
-/* Demo form (used on demo.html) ------------------------------------ */
+/* Demo form -------------------------------------------------------- */
 .demo-form { display: flex; flex-direction: column; gap: 14px; }
 .demo-form label {
   display: flex;
