@@ -205,108 +205,23 @@
   if (philosophyClose) philosophyClose.addEventListener("click", closePhilosophy);
 
   // ---------------------------------------------------------------------
-  // Generic small popup (used by Request a Demo). Reuses the panel infra
-  // from before but now sized as a centered form popup.
-  // ---------------------------------------------------------------------
-  const panel      = document.getElementById("panel");
-  const backdrop   = document.getElementById("panel-backdrop");
-  const panelTitle = document.getElementById("panel-title");
-  const panelBody  = document.getElementById("panel-body");
-  const panelClose = document.getElementById("panel-close");
-
-  const PANEL_CONTENT = {
-    demo: {
-      title: "Request a Demo",
-      html:  `<h2>Request a Demo</h2>
-              <p>Leave your details. We'll send a calendar link.</p>
-              <form class="demo-form" id="demo-form" novalidate>
-                <label>Name
-                  <input type="text" name="name" required />
-                </label>
-                <label>Email
-                  <input type="email" name="email" required />
-                </label>
-                <label>Company
-                  <input type="text" name="company" />
-                </label>
-                <label>What do you want to see?
-                  <textarea name="message" rows="3"></textarea>
-                </label>
-                <div class="demo-form__row">
-                  <button class="demo-form__submit" type="submit">Send</button>
-                  <span class="demo-form__msg" id="demo-msg"></span>
-                </div>
-              </form>`
-    }
-  };
-
-  function openPanel(key, originEl) {
-    if (!panel) return;
-    const data = PANEL_CONTENT[key];
-    if (!data) return;
-
-    if (originEl) {
-      const r = originEl.getBoundingClientRect();
-      // express origin as a percentage of the viewport so the
-      // transform-origin makes sense across panel translate(-50%,-50%).
-      panel.style.setProperty("--ox", ((r.left + r.width / 2) / window.innerWidth * 100) + "%");
-      panel.style.setProperty("--oy", ((r.top + r.height / 2) / window.innerHeight * 100) + "%");
-    }
-
-    panelTitle.textContent = data.title;
-    panelBody.innerHTML    = data.html;
-
-    panel.hidden = false;
-    if (backdrop) backdrop.hidden = false;
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => panel.classList.add("is-open"));
-    });
-
-    // wire the demo form if present
-    const form = document.getElementById("demo-form");
-    if (form) {
-      form.addEventListener("submit", (e) => {
-        e.preventDefault();
-        const msg = document.getElementById("demo-msg");
-        if (msg) msg.textContent = "Sent. We'll be in touch.";
-        form.reset();
-      });
-    }
-  }
-
-  function closePanel() {
-    if (!panel) return;
-    panel.classList.remove("is-open");
-    const onEnd = () => {
-      panel.hidden = true;
-      if (backdrop) backdrop.hidden = true;
-      panel.removeEventListener("transitionend", onEnd);
-    };
-    panel.addEventListener("transitionend", onEnd);
-  }
-
-  if (panelClose) panelClose.addEventListener("click", closePanel);
-  if (backdrop)   backdrop.addEventListener("click", closePanel);
-
-  // ---------------------------------------------------------------------
   // Menu dispatch: route each menu item to the right behavior.
   //   Products    -> open products view
-  //   Philosophy  -> navigate to its own page
-  //   Demo        -> open the form popup
+  //   Philosophy  -> open philosophy overlay
+  //   Demo        -> navigate to demo.html
   // ---------------------------------------------------------------------
   document.querySelectorAll(".menu__item").forEach((btn) => {
     btn.addEventListener("click", () => {
       const action = btn.dataset.action;
       if (action === "products")        openProducts();
       else if (action === "philosophy") openPhilosophy();
-      else if (action === "demo")       openPanel("demo", btn);
+      else if (action === "demo")       window.location.href = "demo.html";
     });
   });
 
   // Esc closes whatever's open.
   window.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    if (panel && !panel.hidden) closePanel();
     if (products && !products.hidden) closeProducts();
     if (philosophy && !philosophy.hidden) closePhilosophy();
   });
