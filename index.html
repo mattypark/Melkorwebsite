@@ -33,10 +33,9 @@
     </button>
   </aside>
 
-  <!-- Products view: 3 cards pushed to the right side. Each card can be
-       expanded; expanding one shrinks the other two. Click X to close. -->
-  <aside class="products" id="products" hidden>
-    <button class="products__close" id="products-close" type="button" aria-label="close">&times;</button>
+  <!-- Products: 3 cards anchored to lower portion of the screen. Always
+       visible. Each card can be expanded; expanding one shrinks the others. -->
+  <aside class="products" id="products">
     <div class="product-card" data-product="a">
       <button class="product-card__expand" type="button" aria-label="expand">+</button>
       <div class="product-card__head">

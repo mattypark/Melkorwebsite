@@ -153,46 +153,30 @@ header.tl {
   z-index: 1;
 }
 
-/* Products view ----------------------------------------------------- */
-/* Pushed to the right of the screen so the menu stays visible on the
-   left. 3 cards in a row, each can be expanded; expanding one grows it
-   and shrinks the other two via flex-grow transitions. */
+/* Products row ------------------------------------------------------ */
+/* Anchored to the lower portion of the viewport. Always visible. 3
+   cards in a row; expanding one grows it and shrinks the other two
+   via flex-grow transitions. */
 .products {
   position: fixed;
-  top: 22px;
-  right: 22px;
-  bottom: 22px;
   left: 320px;
-  z-index: 70;
+  right: 22px;
+  bottom: 30px;
+  height: 42vh;
+  min-height: 240px;
+  z-index: 5;
   display: flex;
   gap: 14px;
-  opacity: 0;
-  transform: translateY(8px);
-  pointer-events: none;
-  transition: opacity 280ms ease, transform 320ms cubic-bezier(.22, 1, .36, 1);
 }
-.products[hidden] { display: none; }
-.products.is-open {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
+
+.products.pulse .product-card {
+  animation: products-pulse 600ms ease;
 }
-.products__close {
-  position: absolute;
-  top: 10px;
-  right: 14px;
-  width: 28px;
-  height: 28px;
-  font-size: 22px;
-  line-height: 1;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-  z-index: 2;
-  transition: color 160ms ease, background 160ms ease;
+@keyframes products-pulse {
+  0%   { transform: translateY(0); }
+  50%  { transform: translateY(-6px); }
+  100% { transform: translateY(0); }
 }
-.products__close:hover { color: var(--fg); background: rgba(0,0,0,0.06); }
 
 .product-card {
   position: relative;

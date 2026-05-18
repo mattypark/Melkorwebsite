@@ -1,22 +1,20 @@
-// Melkor — bg canvas of 1s/0s + menu actions (products view, philosophy
-// page nav, demo form popup) + C key contact shortcut.
+// Melkor — bg canvas of a moving eye (red field, black almond, pupil
+// tracks left-right with occasional blink) + menu actions + C key
+// contact shortcut.
 //
 // No external deps. All animation runs in a single rAF loop.
 
 (function () {
   // ---------------------------------------------------------------------
-  // Background: a grid of 1s and 0s drawn on a canvas. Each cell has a
-  // slow alpha pulse phase so the whole field shimmers, and each cell
-  // has a small per-frame chance of flipping 0<->1 so the field is
-  // visibly "changing" without ever scrolling.
+  // Background: red field with a black almond-shaped eye. The pupil is
+  // a red circle that sways smoothly left/right inside the eye, and the
+  // eye blinks shut briefly on a slow interval.
   // ---------------------------------------------------------------------
   const bgCanvas = document.getElementById("bg-canvas");
   const bgCtx    = bgCanvas.getContext("2d");
-  const CELL     = 22;     // px between cells
-  const FONT_PX  = 11;
   const DPR      = Math.min(window.devicePixelRatio || 1, 2);
-  let cols = 0, rows = 0;
-  let cells = [];          // flat array, length = cols*rows
+  const BG_COLOR = "#ffffff";
+  const FG_COLOR = "#000000";
 
   function bgResize() {
     bgCanvas.width        = window.innerWidth  * DPR;
@@ -24,37 +22,67 @@
     bgCanvas.style.width  = window.innerWidth  + "px";
     bgCanvas.style.height = window.innerHeight + "px";
     bgCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    cols = Math.ceil(window.innerWidth  / CELL) + 1;
-    rows = Math.ceil(window.innerHeight / CELL) + 1;
-    cells = new Array(cols * rows);
-    for (let i = 0; i < cells.length; i++) {
-      cells[i] = {
-        v: Math.random() < 0.5 ? "0" : "1",
-        p: Math.random() * Math.PI * 2          // per-cell pulse phase
-      };
-    }
   }
   bgResize();
   window.addEventListener("resize", bgResize);
 
   function bgFrame(t) {
-    bgCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-    bgCtx.font = FONT_PX + 'px ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace';
-    bgCtx.textAlign = "center";
-    bgCtx.textBaseline = "middle";
-    const time = t * 0.0008;
-    for (let r = 0; r < rows; r++) {
-      const y = r * CELL + CELL / 2;
-      for (let c = 0; c < cols; c++) {
-        const cell = cells[r * cols + c];
-        // small flip chance: keeps the field "changing"
-        if (Math.random() < 0.0015) cell.v = cell.v === "0" ? "1" : "0";
-        // alpha breathing per cell
-        const a = 0.18 + Math.sin(time + cell.p) * 0.10;
-        bgCtx.fillStyle = "rgba(45, 92, 220, " + a.toFixed(3) + ")";
-        bgCtx.fillText(cell.v, c * CELL + CELL / 2, y);
-      }
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+
+    // white field
+    bgCtx.fillStyle = BG_COLOR;
+    bgCtx.fillRect(0, 0, W, H);
+
+    // eye geometry — centered in the *open* area of the viewport, i.e.
+    // to the right of the left menu column and above the bottom row of
+    // product cards, so the eye doesn't get covered up.
+    const MENU_RIGHT  = W < 720 ? 0 : 320;
+    const CARDS_TOP   = H - 30 - Math.max(H * 0.42, 240);
+    const cx = (MENU_RIGHT + W) / 2;
+    const cy = CARDS_TOP / 2;
+    const availW = W - MENU_RIGHT - 40;
+    const availH = CARDS_TOP - 40;
+    const ew = Math.min(availW * 0.85, availH / 0.42, 920);
+    const eh = ew * 0.42;
+
+    // blink: short pulse every ~4.5s; openness curves 1 -> 0 -> 1
+    const BLINK_PERIOD = 4500;
+    const BLINK_DUR    = 220;
+    const tp = t % BLINK_PERIOD;
+    let openness = 1;
+    if (tp < BLINK_DUR) {
+      const k = tp / BLINK_DUR;
+      openness = 1 - Math.sin(k * Math.PI);
     }
+    const halfH = (eh / 2) * openness;
+
+    // almond: two quadratic curves meeting at the left and right points
+    bgCtx.fillStyle = FG_COLOR;
+    bgCtx.beginPath();
+    bgCtx.moveTo(cx - ew / 2, cy);
+    bgCtx.quadraticCurveTo(cx, cy - halfH * 2, cx + ew / 2, cy);
+    bgCtx.quadraticCurveTo(cx, cy + halfH * 2, cx - ew / 2, cy);
+    bgCtx.closePath();
+    bgCtx.fill();
+
+    // pupil: red circle drawn inside a clip of the eye so it never
+    // bleeds past the lid; only shown when eye is open enough to see it
+    if (openness > 0.05) {
+      bgCtx.save();
+      bgCtx.clip();
+      const pupilR = eh * 0.48;
+      const sweep  = (ew * 0.5 - pupilR) * 0.55;
+      // smooth left/right sway, slow
+      const sway   = Math.sin(t * 0.0006);
+      const px     = cx + sway * sweep;
+      bgCtx.fillStyle = BG_COLOR;
+      bgCtx.beginPath();
+      bgCtx.arc(px, cy, pupilR, 0, Math.PI * 2);
+      bgCtx.fill();
+      bgCtx.restore();
+    }
+
     requestAnimationFrame(bgFrame);
   }
   requestAnimationFrame(bgFrame);
@@ -71,32 +99,11 @@
   });
 
   // ---------------------------------------------------------------------
-  // Products view: 3 cards on the right. Click + on any card to expand
-  // it (the other two shrink via flex). Click again to collapse.
+  // Products row: 3 cards anchored to the lower portion of the screen.
+  // Always visible. Click + on a card to expand it (others shrink via
+  // flex-grow). Click again to collapse.
   // ---------------------------------------------------------------------
-  const products      = document.getElementById("products");
-  const productsClose = document.getElementById("products-close");
-
-  function openProducts() {
-    if (!products) return;
-    products.hidden = false;
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => products.classList.add("is-open"));
-    });
-  }
-  function closeProducts() {
-    if (!products) return;
-    products.classList.remove("is-open");
-    // collapse any expanded card so it resets next open
-    products.classList.remove("has-expanded");
-    products.querySelectorAll(".product-card.is-expanded").forEach((c) => c.classList.remove("is-expanded"));
-    const onEnd = () => {
-      if (!products.classList.contains("is-open")) products.hidden = true;
-      products.removeEventListener("transitionend", onEnd);
-    };
-    products.addEventListener("transitionend", onEnd);
-  }
-  if (productsClose) productsClose.addEventListener("click", closeProducts);
+  const products = document.getElementById("products");
 
   // Card expand buttons.
   document.querySelectorAll(".product-card__expand").forEach((btn) => {
@@ -179,16 +186,24 @@
 
   // ---------------------------------------------------------------------
   // Menu dispatch: route each menu item to the right behavior.
-  //   Products    -> open products view
+  //   Products    -> cards already visible; expand first card as a hint
   //   Philosophy  -> navigate to its own page
   //   Demo        -> open form popup
   // ---------------------------------------------------------------------
   document.querySelectorAll(".menu__item").forEach((btn) => {
     btn.addEventListener("click", () => {
       const action = btn.dataset.action;
-      if (action === "products")        openProducts();
-      else if (action === "philosophy") window.location.href = "philosophy.html";
-      else if (action === "demo")       openPanel();
+      if (action === "products") {
+        // brief pulse so the user sees where the cards are
+        if (products) {
+          products.classList.add("pulse");
+          setTimeout(() => products.classList.remove("pulse"), 600);
+        }
+      } else if (action === "philosophy") {
+        window.location.href = "philosophy.html";
+      } else if (action === "demo") {
+        openPanel();
+      }
     });
   });
 
@@ -196,6 +211,5 @@
   window.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     if (panel && !panel.hidden) closePanel();
-    if (products && !products.hidden) closeProducts();
   });
 })();
