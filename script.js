@@ -1,20 +1,50 @@
-// Melkor — bg canvas of a moving eye (red field, black almond, pupil
-// tracks left-right with occasional blink) + menu actions + C key
-// contact shortcut.
+// Melkor — bg canvas of slowly drifting "galaxy" dots on a dark field
+// + menu actions + C key contact shortcut.
 //
 // No external deps. All animation runs in a single rAF loop.
 
 (function () {
   // ---------------------------------------------------------------------
-  // Background: red field with a black almond-shaped eye. The pupil is
-  // a red circle that sways smoothly left/right inside the eye, and the
-  // eye blinks shut briefly on a slow interval.
+  // Background: a single cluster of white dots floating in dark space.
+  // Each dot moves radially inward toward the cluster center; when it
+  // gets close, it respawns out at the rim. Closer dots are brighter
+  // and slightly larger, so the cluster reads as a soft attractor with
+  // depth. The whole cluster center drifts gently so the field feels
+  // alive rather than locked to a pixel.
   // ---------------------------------------------------------------------
   const bgCanvas = document.getElementById("bg-canvas");
   const bgCtx    = bgCanvas.getContext("2d");
   const DPR      = Math.min(window.devicePixelRatio || 1, 2);
-  const BG_COLOR = "#ffffff";
-  const FG_COLOR = "#000000";
+  const BG_COLOR = "#0d1117";   // deep slate, near-black
+  const N_PARTS  = 110;
+
+  let maxR = 320;
+  let particles = [];
+
+  function spawn(atRim) {
+    const angle = Math.random() * Math.PI * 2;
+    const r = atRim
+      ? maxR * (0.85 + Math.random() * 0.18)
+      : maxR * (0.15 + Math.random() * 0.85);
+    return {
+      a:    angle,
+      r:    r,
+      // inward speed in px/frame
+      vr:   0.18 + Math.random() * 0.45,
+      // tiny angular drift so paths aren't perfectly radial
+      vt:   (Math.random() - 0.5) * 0.0025,
+      // per-particle pulse offsets
+      p:    Math.random() * Math.PI * 2,
+      ps:   0.0005 + Math.random() * 0.0014,
+      // most are tiny; a few are bigger feature dots
+      big:  Math.random() < 0.12
+    };
+  }
+
+  function initParticles() {
+    particles = new Array(N_PARTS);
+    for (let i = 0; i < N_PARTS; i++) particles[i] = spawn(false);
+  }
 
   function bgResize() {
     bgCanvas.width        = window.innerWidth  * DPR;
@@ -22,65 +52,55 @@
     bgCanvas.style.width  = window.innerWidth  + "px";
     bgCanvas.style.height = window.innerHeight + "px";
     bgCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    // cluster size: fit in the open area to the right of the menu and
+    // above the bottom card row.
+    const W = window.innerWidth, H = window.innerHeight;
+    const MENU_RIGHT = W < 720 ? 0 : 320;
+    const CARDS_TOP  = H - 30 - Math.max(H * 0.42, 240);
+    const availW    = W - MENU_RIGHT;
+    maxR = Math.max(160, Math.min(availW * 0.42, CARDS_TOP * 0.45, 360));
+    initParticles();
   }
   bgResize();
   window.addEventListener("resize", bgResize);
 
   function bgFrame(t) {
-    const W = window.innerWidth;
-    const H = window.innerHeight;
+    const W = window.innerWidth, H = window.innerHeight;
+    const MENU_RIGHT = W < 720 ? 0 : 320;
+    const CARDS_TOP  = H - 30 - Math.max(H * 0.42, 240);
+    const baseCx = MENU_RIGHT + (W - MENU_RIGHT) / 2;
+    const baseCy = CARDS_TOP / 2;
+    // cluster center floats gently
+    const cx = baseCx + Math.sin(t * 0.00018) * 22;
+    const cy = baseCy + Math.cos(t * 0.00014) * 14;
 
-    // white field
+    // dark field
     bgCtx.fillStyle = BG_COLOR;
     bgCtx.fillRect(0, 0, W, H);
 
-    // eye geometry — centered in the *open* area of the viewport, i.e.
-    // to the right of the left menu column and above the bottom row of
-    // product cards, so the eye doesn't get covered up.
-    const MENU_RIGHT  = W < 720 ? 0 : 320;
-    const CARDS_TOP   = H - 30 - Math.max(H * 0.42, 240);
-    const cx = (MENU_RIGHT + W) / 2;
-    const cy = CARDS_TOP / 2;
-    const availW = W - MENU_RIGHT - 40;
-    const availH = CARDS_TOP - 40;
-    const ew = Math.min(availW * 0.85, availH / 0.42, 920);
-    const eh = ew * 0.42;
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      p.r -= p.vr;
+      p.a += p.vt;
+      // respawn at rim once a particle nears the center
+      if (p.r < 6) particles[i] = spawn(true);
 
-    // blink: short pulse every ~4.5s; openness curves 1 -> 0 -> 1
-    const BLINK_PERIOD = 4500;
-    const BLINK_DUR    = 220;
-    const tp = t % BLINK_PERIOD;
-    let openness = 1;
-    if (tp < BLINK_DUR) {
-      const k = tp / BLINK_DUR;
-      openness = 1 - Math.sin(k * Math.PI);
-    }
-    const halfH = (eh / 2) * openness;
+      const x = cx + Math.cos(p.a) * p.r;
+      const y = cy + Math.sin(p.a) * p.r;
 
-    // almond: two quadratic curves meeting at the left and right points
-    bgCtx.fillStyle = FG_COLOR;
-    bgCtx.beginPath();
-    bgCtx.moveTo(cx - ew / 2, cy);
-    bgCtx.quadraticCurveTo(cx, cy - halfH * 2, cx + ew / 2, cy);
-    bgCtx.quadraticCurveTo(cx, cy + halfH * 2, cx - ew / 2, cy);
-    bgCtx.closePath();
-    bgCtx.fill();
+      // proximity 0 (rim) -> 1 (center). Closer = bigger, brighter.
+      const prox = 1 - p.r / maxR;
+      const rad  = p.big
+        ? 1.8 + prox * 3.4
+        : 0.5 + prox * 1.5;
+      let a = (0.25 + prox * 0.65) * (0.75 + Math.sin(t * p.ps + p.p) * 0.25);
+      if (a < 0) a = 0; else if (a > 1) a = 1;
 
-    // pupil: red circle drawn inside a clip of the eye so it never
-    // bleeds past the lid; only shown when eye is open enough to see it
-    if (openness > 0.05) {
-      bgCtx.save();
-      bgCtx.clip();
-      const pupilR = eh * 0.48;
-      const sweep  = (ew * 0.5 - pupilR) * 0.55;
-      // smooth left/right sway, slow
-      const sway   = Math.sin(t * 0.0006);
-      const px     = cx + sway * sweep;
-      bgCtx.fillStyle = BG_COLOR;
+      bgCtx.fillStyle = "rgba(255, 255, 255, " + a.toFixed(3) + ")";
       bgCtx.beginPath();
-      bgCtx.arc(px, cy, pupilR, 0, Math.PI * 2);
+      bgCtx.arc(x, y, rad, 0, Math.PI * 2);
       bgCtx.fill();
-      bgCtx.restore();
     }
 
     requestAnimationFrame(bgFrame);

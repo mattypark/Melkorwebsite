@@ -49,6 +49,7 @@ header.tl {
   font-size: 22px;
   letter-spacing: -0.025em;
   font-weight: 500;
+  color: #ffffff;
   opacity: 0;
   animation: wordmark-in 900ms cubic-bezier(.22, 1, .36, 1) 120ms forwards;
 }
@@ -143,6 +144,7 @@ header.tl {
   gap: 2px;
   font-size: 13px;
   z-index: 10;
+  color: rgba(255, 255, 255, 0.85);
 }
 .br a:hover { text-decoration: underline; }
 
